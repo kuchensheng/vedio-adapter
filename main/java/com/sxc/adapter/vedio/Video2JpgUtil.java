@@ -1,9 +1,7 @@
 package com.sxc.adapter.vedio;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -18,13 +16,13 @@ import org.bytedeco.javacv.Frame;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.IplImage;
-import org.bytedeco.opencv.opencv_core.Mat;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.nio.Buffer;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,8 +30,9 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 /**
@@ -335,7 +334,7 @@ public class Video2JpgUtil {
      */
     public static void createVedio(List<String> FilenameList,String targetFile,Integer imageWidth,Integer imageHeight,Integer frameRate) throws FrameRecorder.Exception {
         FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(targetFile,imageWidth,imageHeight);
-        recorder.setVideoCodec(avcodec.AV_CODEC_ID_FLV1);
+        recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
         recorder.setFormat("flv");
         recorder.setFrameRate((null == frameRate || frameRate < 20 ) ? 24 : frameRate);
 //        recorder.setPixelFormat(0);
@@ -435,12 +434,14 @@ public class Video2JpgUtil {
 //        for (VedioDataAddressModel vedioDataAddressModel : vedioInputStreamAddress) {
 //            System.out.println(vedioDataAddressModel.toString());
 //        }
-        String veidoAddress = getVedioStream(accessToken,deviceSerial,VedioTypeEnum.LIVE);
+        List<String> veidoAddress = getVedioStream(accessToken,deviceSerial,VedioTypeEnum.LIVE);
 
 
 
 
-        test1(veidoAddress);
+        for (String addr : veidoAddress) {
+            test1(addr);
+        }
         buffer.clear();
 
     }
@@ -449,7 +450,7 @@ public class Video2JpgUtil {
         HD,LIVE,RTMP,HD_RPTM;
     }
 
-    public static String getVedioStream(String accessToken,String deviceSerial,VedioTypeEnum type) throws Exception {
+    public static List<String> getVedioStream(String accessToken,String deviceSerial,VedioTypeEnum type) throws Exception {
         VedioDataAddressModel vedioInputStreamAddessWithDeviceSerial = getVedioInputStreamAddessWithDeviceSerial(accessToken, deviceSerial, 1, null);
 
         if(null == vedioInputStreamAddessWithDeviceSerial) {
@@ -470,37 +471,96 @@ public class Video2JpgUtil {
                     vedioAddress = vedioInputStreamAddessWithDeviceSerial.getLiveAddress();
                     break;
         }
-        //获取视频源
-        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(vedioAddress);
+        logger.info("视频地址："+vedioAddress);
 
-//        final CloseableHttpClient httpClient = HttpClients.createDefault();
-//        final HttpGet request = new HttpGet(vedioAddress);
-//        CloseableHttpResponse httpResponse = httpClient.execute(request);
-//
-//        InputStream content = httpResponse.getEntity().getContent();
-//
-//        byte[] data = new byte[1024];
-//        while (content.read(data) != -1) {
-//            buffer.put(data);
-//        }
-//        content.close();
+        String indexContent = getIndexFile(vedioAddress);
 
-//        executorService.execute(new Runnable() {
-//            @Override
-//            public void run() {
-//                try {
-//                    CloseableHttpResponse httpResponse = httpClient.execute(request);
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        });
-    return vedioAddress;
+        logger.info("内容解析："+indexContent);
+
+        List<String> list = analysisIndex(indexContent);
+        for (String content : list) {
+            logger.info("视频ts地址："+content);
+        }
+
+        List<String> result = downLoadIndexFile(list);
+
+        mergeFile2Vedio(result,"/Users/kuchensheng/Desktop/merge.mp4");
+
+    return result;
 
     }
 
+    private static void mergeFile2Vedio(List<String> result,String target) throws Exception{
+
+        FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(new File(target),800,600);
+//        FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(targetFile,imageWidth,imageHeight);
+        recorder.setVideoCodec(avcodec.AV_CODEC_ID_MPEG4);
+        recorder.setFormat("mp4");
+        recorder.setFrameRate(24);
+//        recorder.setPixelFormat(0);
+        recorder.start();
+
+        OpenCVFrameConverter.ToIplImage converter = new OpenCVFrameConverter.ToIplImage();
+        for (String fileName : result) {
+            IplImage image = opencv_imgcodecs.cvLoadImage(fileName);
+            Frame frame = converter.convert(image);
+            recorder.record(frame);
+            opencv_core.cvReleaseImage(image);
+        }
+        recorder.stop();
+        recorder.close();
+    }
+
+    private static List<String> downLoadIndexFile(List<String> list) throws Exception {
+        List<String> result = new ArrayList<>();
+        for (int i = 0 ;i < list.size();i++) {
+            URL url = new URL(list.get(i));
+            URLConnection conn = url.openConnection();
+            InputStream content = conn.getInputStream();
+            String filePath = "/Users/kuchensheng/Desktop/songxiaocai_"+i+".ts";
+            createFile(filePath);
+            FileOutputStream fileOutputStream = new FileOutputStream(new File(filePath));
+            byte[] data = new byte[1024];
+            while (content.read(data) != -1) {
+                fileOutputStream.write(data);
+            }
+            fileOutputStream.flush();
+            fileOutputStream.close();
+            content.close();
+            result.add(filePath);
+        }
+        return result;
+//        return outputStream;
+    }
+
+    private static List analysisIndex(String content) {
+        Pattern pattern = Pattern.compile(".*ts");
+        Matcher ma = pattern.matcher(content);
+
+        List<String> list = new ArrayList<>();
+
+        while(ma.find()){
+            String s = ma.group();
+            list.add(s);
+            System.out.println(s);
+        }
+        return list;
+    }
+
+    private static String getIndexFile(String vedioAddress) throws Exception{
+        URL url = new URL(vedioAddress);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(),"UTF-8"));
+        StringBuilder contentBuilder = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            contentBuilder.append(line).append("\n");
+        }
+        reader.close();
+        return contentBuilder.toString();
+    }
+
     private static void test1(String vedioAddress) throws Exception{
-//        File file = new File("/Users/kuchensheng/Desktop/panda.mp4");
+//        File file = new File("/Users/kuchensheng/Desktop/panda_new.mp4");
 //        FileInputStream inputStream = new FileInputStream(file);
         FFmpegFrameGrabber ff = new FFmpegFrameGrabber(vedioAddress);
         ff.start();
@@ -522,7 +582,7 @@ public class Video2JpgUtil {
             finalVedioData.addAll(getBeforeSecondsFrames(ff,Integer.valueOf(key),2,"/Users/kuchensheng/Desktop/panda/final/","/Users/kuchensheng/Desktop/panda/image"+key+".jpg"));
         }
         Frame frame = getFrame(ff,10);
-        createVedio(finalVedioData,"/Users/kuchensheng/Desktop/panda_new.flv",frame.imageWidth,frame.imageHeight,24);
+        createVedio(finalVedioData,"/Users/kuchensheng/Desktop/panda_new_1.mp4",frame.imageWidth,frame.imageHeight,24);
         ff.close();
     }
 }
