@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import static org.bytedeco.ffmpeg.global.avutil.AVCOL_RANGE_MPEG;
@@ -57,6 +58,8 @@ public class VedioPulper {
     private String kafka_bootstrap_server;
 
     private KafkaProducer<String,String> producer;
+
+    private static AtomicInteger index = new AtomicInteger(0);
 
     private static Queue<String> queue = new LinkedBlockingQueue<>();
 
@@ -101,7 +104,7 @@ public class VedioPulper {
 
         final double frameRate = grabber.getFrameRate();
         final long sleepTime = (long) (1/frameRate * 1000);
-        FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(vedioPath,frameWight,frameHeigh,2);
+        FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(vedioPath,frameWight,frameHeigh,1);
         recorder.setInterleaved(true);
         recorder.setVideoOption("tune","zerolatency");
         recorder.setVideoOption("preset","ultrafast");
@@ -112,22 +115,39 @@ public class VedioPulper {
         recorder.setFrameRate(grabber.getFrameRate());
         recorder.setGopSize(60);
         recorder.start();
-        long index = 0l;
+
+        long startTime_null = System.currentTimeMillis();
+        boolean restart = false;
         while (true) {
             try {
                 Frame frame = grabber.grabFrame();
-                if(null != frame && null != frame.image) {
+                if(null == frame || null == frame.image) {
+                    long endTime = System.currentTimeMillis();
+                    if(endTime - startTime_null > 1000) {
+                        restart = true;
+                        break;
+                    }
+                }else {
+                    startTime_null = System.currentTimeMillis();
                     recorder.record(frame);
-                }
-                if(index % (int) (frameRate/2) == 0) {
-                    send2Kafka(frame,index);
+                    if(index.get() % (int) (frameRate/2) == 0) {
+                        send2Kafka(frame,index.get());
+                    }
                 }
                 TimeUnit.MILLISECONDS.sleep(sleepTime);
-                index ++;
-            } catch (Exception e) {
+                index.incrementAndGet();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
+
+        if(restart) {
+            logger.info("长时间获取不到frame，重新拉取视频");
+            pull();
+        }
+
 
 
     }
@@ -143,8 +163,14 @@ public class VedioPulper {
             jsonObject.put("key",key);
             jsonObject.put("img_data",byte_data);
             ProducerRecord<String, String> producerRecord = new ProducerRecord<>(kafka_topic,jsonObject.toJSONString());
-            producer.send(producerRecord, (metadata,exception) -> {
-                logger.info("图片index="+key+"发送到Kafka成功");
+            Future<RecordMetadata> send = producer.send(producerRecord, (metadata, exception) -> {
+                if (exception != null) {
+                    exception.printStackTrace();
+                    logger.info(exception.getMessage());
+                } else {
+                    logger.info("图片index=" + key + "发送到Kafka成功");
+                }
+
             });
         }
 
@@ -184,7 +210,7 @@ public class VedioPulper {
         int width = 780;
         int height = (int) (((double) width / owidth) * oheight);
         BufferedImage fecthedImage =converter.getBufferedImage(frame);
-        BufferedImage bi = new BufferedImage(owidth, oheight, BufferedImage.TYPE_3BYTE_BGR);
+        BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
         bi.getGraphics().drawImage(fecthedImage.getScaledInstance(width, height, Image.SCALE_SMOOTH),
                 0, 0, null);
 //                bi=rotateImage(bi, 90);
@@ -212,13 +238,10 @@ public class VedioPulper {
         }
     }
 
-    public void start() {
+    public void start() throws Exception {
         state = true;
-        try {
-            pull();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        pull();
+
     }
 
     enum VedioType {
@@ -267,7 +290,7 @@ public class VedioPulper {
         try {
 //            String str = Loader.load(opencv_objdetect.class);
 //            logger.info(str);
-            String uri = "rtmp://rtmp01open.ys7.com/openlive/c5c1ba029e784f719b7ba3bf1f772c19";
+            String uri = "rtmp://rtmp01open.ys7.com/openlive/c5c1ba029e784f719b7ba3bf1f772c19.hd";
             VedioPulper pulper = new VedioPulper(uri,"/Users/kuchensheng/Desktop/test/","kafka1:9092,kafka2:9092,kafka3:9092");
         pulper.start();
 
