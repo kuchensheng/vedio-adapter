@@ -61,7 +61,9 @@ public class VedioPulper {
 
     private static AtomicInteger index = new AtomicInteger(0);
 
-    private static Queue<String> queue = new LinkedBlockingQueue<>();
+    public static List<String> queue = new ArrayList<>();
+
+    private static AtomicInteger vedio_index = new AtomicInteger(0);
 
     public VedioPulper(String vedioAddress, String targetFilePath) {
         this.vedioAddress = vedioAddress;
@@ -98,7 +100,9 @@ public class VedioPulper {
         grabber.start();
 
         //开启监听frames
-        final String vedioPath = this.targetFilePath.concat("vedio.mp4");
+        final String vedioPath = this.targetFilePath.concat(vedio_index.getAndIncrement()+"_").concat("vedio.mp4");
+        logger.info("摄像头录制的视频地址："+vedioPath);
+        queue.add(vedioPath);
         final Integer frameWight = grabber.getImageWidth();
         final Integer frameHeigh = grabber.getImageHeight();
 
