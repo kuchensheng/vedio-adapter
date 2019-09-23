@@ -351,47 +351,7 @@ public class Video2JpgUtil {
         recorder.close();
     }
 
-    /**
-     * 获取萤石云直播视频地址
-     * @return
-     */
-    public static List<VedioDataAddressModel> getVedioInputStreamAddress(String accessToken,Integer pageNo,Integer pageSize) throws Exception {
-        CloseableHttpClient httpClient = HttpClients.createDefault();
-        HttpPost request = new HttpPost(URL_GET_VEDIO_LIST);
-        List<NameValuePair> formParams = new ArrayList<>();
-        formParams.add(new BasicNameValuePair("accessToken",accessToken));
-        if(null == accessToken || accessToken.trim().length() ==0 ) {
-            throw new Exception("accessToke is required");
-        }
-        if(null != pageNo) {
-            formParams.add(new BasicNameValuePair("pageStart",pageNo+""));
-        }
-        if(null != pageSize) {
-            if(pageSize < 10) {pageSize = 10;}
-            else if(pageSize > 50) {pageSize = 50;}
-            formParams.add(new BasicNameValuePair("pageSize",pageSize+""));
-        }
 
-        UrlEncodedFormEntity entity = new UrlEncodedFormEntity(formParams,"UTF-8");
-        request.setEntity(entity);
-
-        CloseableHttpResponse response = httpClient.execute(request);
-        InputStream content = response.getEntity().getContent();
-        List<VedioDataAddressModel> result = new LinkedList<>();
-        if(null != content) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(content,"UTF-8"));
-            StringBuilder stringBuilder = new StringBuilder();
-            String s;
-            while ((s = reader.readLine()) != null) {
-                stringBuilder.append(s);
-            }
-            reader.close();
-            JSONObject jsonObject = JSONObject.parseObject(stringBuilder.toString());
-            JSONArray data = jsonObject.getJSONArray("data");
-            result = data.toJavaList(VedioDataAddressModel.class);
-        }
-        return result;
-    }
 
     public static VedioDataAddressModel getVedioInputStreamAddessWithDeviceSerial(String accessToken,String deviceSerial,Integer channelNo,Integer expireTime) throws Exception{
         CloseableHttpClient httpClient = HttpClients.createDefault();
