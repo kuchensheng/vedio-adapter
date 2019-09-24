@@ -65,7 +65,10 @@ public class VedioPulper {
     private String deviceSerial;
 
     public VedioPulper(String vedioAddress, String targetPath, String frameTargetAddress, IVedioPullService.FrameTargetTypeEnum type,String deviceSerial) {
-        this(vedioAddress,targetPath,frameTargetAddress,deviceSerial);
+        this.vedioAddress = vedioAddress;
+        this.targetFilePath = targetPath;
+        this.kafka_bootstrap_server = frameTargetAddress;
+        this.deviceSerial = deviceSerial;
         this.type = type;
         if (null == type) {
             throw new RuntimeException("type is required");
@@ -122,7 +125,10 @@ public class VedioPulper {
             setTargetFilePath(targetFilePath.concat(File.separator));
         }
 
-        setTargetFilePath(this.targetFilePath.concat(this.deviceSerial).concat(File.separator));
+        if(!getFinalVideoPath().contains(this.deviceSerial)) {
+            setTargetFilePath(this.targetFilePath.concat(this.deviceSerial).concat(File.separator));
+        }
+
         createFile(getTargetFilePath());
         FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(this.vedioAddress);
         grabber.start();
@@ -131,7 +137,7 @@ public class VedioPulper {
 //        format = "mp4";
         //两个小时更改一次地址信息
         this.task = new Task(getTargetFilePath(),format);
-        new Timer("updateVedioPathTimer").schedule(task,0,3600000);
+        new Timer("updateVedioPathTimer").schedule(task,0,600000);
         logger.info("摄像头录制的视频地址："+getFinalVideoPath());
         Integer frameWight = grabber.getImageWidth();
         Integer frameHeigh = grabber.getImageHeight();
@@ -172,7 +178,7 @@ public class VedioPulper {
         public void run() {
             LocalDateTime now = LocalDateTime.now();
             start = now.getNano();
-            String endTime = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH"));
+            String endTime = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm"));
             setFinalVideoPath(getVedioPath().concat(endTime).concat("_"+vedio_index.get()).concat(".").concat(this.format));
             //当重新生成视频时，帧数要重新计算
             index.set(0);
@@ -289,20 +295,20 @@ public class VedioPulper {
             String uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121.hd";
 
             VedioPulper pulper = new VedioPulper(uri,"/Users/kuchensheng/Desktop/test","D21784420");
-            FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(uri);
-            grabber.start();
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        pulper.shwoFrames(grabber);
-                        grabber.stop();
-                        grabber.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }).start();
+//            FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(uri);
+//            grabber.start();
+//            new Thread(new Runnable() {
+//                @Override
+//                public void run() {
+//                    try {
+//                        pulper.shwoFrames(grabber);
+//                        grabber.stop();
+//                        grabber.close();
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }).start();
             pulper.start();
 
         } catch (Exception e) {

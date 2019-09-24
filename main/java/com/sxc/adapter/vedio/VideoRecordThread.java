@@ -64,11 +64,9 @@ public class VideoRecordThread extends Thread {
                         this.pulper.send2Kafka(frame,finalVedioPath,index.get());
                     }
                 }
-                TimeUnit.MILLISECONDS.sleep(sleepTime);
+//                TimeUnit.MILLISECONDS.sleep(sleepTime);
                 index.incrementAndGet();
             } catch (IOException e) {
-                e.printStackTrace();
-            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }

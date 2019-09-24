@@ -1,10 +1,10 @@
 package com.sxc.adapter.vedio;
 
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
-
 import java.util.List;
 
+/**
+ * 视频拉取相关接口
+ */
 public interface IVedioPullService {
     /**
      * 获取摄像头列表信息
