@@ -70,7 +70,7 @@ public class Video2JpgUtil {
      * @return
      * @throws Exception
      */
-    public static Map<String,byte[]> fetchFrame(FFmpegFrameGrabber ff, Integer indexFrame, Integer margin, Integer dev) throws Exception {
+    public Map<String,byte[]> fetchFrame(FFmpegFrameGrabber ff, Integer indexFrame, Integer margin, Integer dev) throws Exception {
 
         if (null == indexFrame) {
             indexFrame = 0;
@@ -113,7 +113,7 @@ public class Video2JpgUtil {
      * @return
      * @throws Exception
      */
-    public static byte[] getFrameData(FFmpegFrameGrabber ff,Integer indexFrame) throws Exception {
+    public  byte[] getFrameData(FFmpegFrameGrabber ff,Integer indexFrame) throws Exception {
         int i = indexFrame;
         while (i <= (indexFrame + ff.getVideoFrameRate())) {
             Frame frame = ff.grabFrame();
@@ -131,7 +131,7 @@ public class Video2JpgUtil {
      * @return
      * @throws Exception
      */
-    public static Frame getFrame(FFmpegFrameGrabber ff,Integer indexFrame) throws Exception {
+    public  Frame getFrame(FFmpegFrameGrabber ff,Integer indexFrame) throws Exception {
         int i = indexFrame;
         while (i <= (indexFrame + ff.getVideoFrameRate())) {
             Frame frame = ff.grabFrame();
@@ -148,7 +148,7 @@ public class Video2JpgUtil {
      * @return
      * @throws IOException
      */
-    private static byte[] write2Os(Frame frame) throws IOException {
+    private  byte[] write2Os(Frame frame) throws IOException {
         int owidth = frame.imageWidth ;
         int oheight = frame.imageHeight ;
         //TODO 等比压缩
@@ -179,7 +179,7 @@ public class Video2JpgUtil {
      * @param targetFilePath 目标地址
      * @throws Exception
      */
-    public static void addMarkBySingleText(InputStream imageStream,String mark,int x_coordinate,int y_coordinate,
+    public void addMarkBySingleText(InputStream imageStream,String mark,int x_coordinate,int y_coordinate,
                                            int x_length,int y_length, Color color,String targetFilePath) throws  Exception{
 
         BufferedImage image = ImageIO.read(imageStream);
@@ -206,7 +206,7 @@ public class Video2JpgUtil {
         outputStream.flush();
     }
 
-    private static void createFile(String filePath) throws Exception {
+    private void createFile(String filePath) throws Exception {
         File file = new File(filePath);
         if(file.isFile()) {
             if(!file.exists()) {
@@ -226,7 +226,7 @@ public class Video2JpgUtil {
      * @param inputStream
      * @return
      */
-    public static List<byte[]> vedioConvert2Frames(InputStream inputStream) throws Exception {
+    public  List<byte[]> vedioConvert2Frames(InputStream inputStream) throws Exception {
         FFmpegFrameGrabber ff = new FFmpegFrameGrabber(inputStream);
         ff.start();
 
@@ -238,7 +238,7 @@ public class Video2JpgUtil {
      * @param fFmpegFrameGrabber
      * @return
      */
-    public static List<byte[]> vedioConvert2Frames(FFmpegFrameGrabber fFmpegFrameGrabber) throws Exception {
+    public  List<byte[]> vedioConvert2Frames(FFmpegFrameGrabber fFmpegFrameGrabber) throws Exception {
 
         int length = fFmpegFrameGrabber.getLengthInFrames();
         List<byte[]> result = new LinkedList<>();
@@ -256,7 +256,7 @@ public class Video2JpgUtil {
      * @param fFmpegFrameGrabber
      * @return
      */
-    public static List<byte[]> vedioConvert2Frames(FFmpegFrameGrabber fFmpegFrameGrabber,Integer start,Integer end) throws Exception {
+    public  List<byte[]> vedioConvert2Frames(FFmpegFrameGrabber fFmpegFrameGrabber,Integer start,Integer end) throws Exception {
 
         List<byte[]> result = new LinkedList<>();
         for (int i = start; i < end; i ++) {
@@ -277,7 +277,7 @@ public class Video2JpgUtil {
      * @return
      * @throws Exception
      */
-    public static List<String> getBeforeSecondsFrames(FFmpegFrameGrabber ff ,Integer indexFrame,Integer seconds,String targetFramePath,String markFilePath) throws Exception{
+    public  List<String> getBeforeSecondsFrames(FFmpegFrameGrabber ff ,Integer indexFrame,Integer seconds,String targetFramePath,String markFilePath) throws Exception{
         //视频帧数
         int length = ff.getLengthInFrames();
         //视频长度
@@ -298,7 +298,7 @@ public class Video2JpgUtil {
 
     }
 
-    private static List<String> vedioConvert2Frames(FFmpegFrameGrabber ff, int start, Integer end, String targetFramePath) throws Exception{
+    private  List<String> vedioConvert2Frames(FFmpegFrameGrabber ff, int start, Integer end, String targetFramePath) throws Exception{
         List<String> result = new LinkedList<>();
         targetFramePath = targetFramePath.endsWith(File.separator) ? targetFramePath : targetFramePath.concat(File.separator);
         for (int i = start; i <= end; i ++) {
@@ -315,7 +315,7 @@ public class Video2JpgUtil {
         return result;
     }
 
-    private static String write2Os(byte[] image,String target) throws Exception{
+    private  String write2Os(byte[] image,String target) throws Exception{
         FileOutputStream fileOutputStream = new FileOutputStream(target);
         fileOutputStream.write(image);
         fileOutputStream.close();
@@ -332,7 +332,7 @@ public class Video2JpgUtil {
      * @param frameRate 帧的频率，1秒播放多少帧，默认24帧
      * @throws FrameRecorder.Exception
      */
-    public static void createVedio(List<String> FilenameList,String targetFile,Integer imageWidth,Integer imageHeight,Integer frameRate) throws FrameRecorder.Exception {
+    public  void createVedio(List<String> FilenameList,String targetFile,Integer imageWidth,Integer imageHeight,Integer frameRate) throws FrameRecorder.Exception {
         FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(targetFile,imageWidth,imageHeight);
         recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
         recorder.setFormat("flv");
@@ -353,7 +353,7 @@ public class Video2JpgUtil {
 
 
 
-    public static VedioDataAddressModel getVedioInputStreamAddessWithDeviceSerial(String accessToken,String deviceSerial,Integer channelNo,Integer expireTime) throws Exception{
+    public  VedioDataAddressModel getVedioInputStreamAddessWithDeviceSerial(String accessToken,String deviceSerial,Integer channelNo,Integer expireTime) throws Exception{
         CloseableHttpClient httpClient = HttpClients.createDefault();
         HttpPost request = new HttpPost(URL_GET_VEDIO_WITH_DEVICESERIAL);
         List<NameValuePair> formParams = new ArrayList<>();
@@ -387,7 +387,7 @@ public class Video2JpgUtil {
         
     }
 
-    public static void main(String[] args) throws Exception {
+    public  void main(String[] args) throws Exception {
         String accessToken = "at.dwy9dz86brqcexan5okk0wfc6ruplqsp-2dmn4vbr7f-0pa3qo1-dlbabghfa";
         String deviceSerial="228002873";
 //        List<VedioDataAddressModel> vedioInputStreamAddress = getVedioInputStreamAddress("at.dwy9dz86brqcexan5okk0wfc6ruplqsp-2dmn4vbr7f-0pa3qo1-dlbabghfa", 0, 15);
@@ -410,7 +410,7 @@ public class Video2JpgUtil {
         HD,LIVE,RTMP,HD_RPTM;
     }
 
-    public static List<String> getVedioStream(String accessToken,String deviceSerial,VedioTypeEnum type) throws Exception {
+    public  List<String> getVedioStream(String accessToken,String deviceSerial,VedioTypeEnum type) throws Exception {
         VedioDataAddressModel vedioInputStreamAddessWithDeviceSerial = getVedioInputStreamAddessWithDeviceSerial(accessToken, deviceSerial, 1, null);
 
         if(null == vedioInputStreamAddessWithDeviceSerial) {
@@ -450,7 +450,7 @@ public class Video2JpgUtil {
 
     }
 
-    private static void mergeFile2Vedio(List<String> result,String target) throws Exception{
+    private  void mergeFile2Vedio(List<String> result,String target) throws Exception{
 
         FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(new File(target),800,600);
 //        FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(targetFile,imageWidth,imageHeight);
@@ -471,7 +471,7 @@ public class Video2JpgUtil {
         recorder.close();
     }
 
-    private static List<String> downLoadIndexFile(List<String> list) throws Exception {
+    private  List<String> downLoadIndexFile(List<String> list) throws Exception {
         List<String> result = new ArrayList<>();
         for (int i = 0 ;i < list.size();i++) {
             URL url = new URL(list.get(i));
@@ -493,7 +493,7 @@ public class Video2JpgUtil {
 //        return outputStream;
     }
 
-    private static List analysisIndex(String content) {
+    private  List analysisIndex(String content) {
         Pattern pattern = Pattern.compile(".*ts");
         Matcher ma = pattern.matcher(content);
 
@@ -507,7 +507,7 @@ public class Video2JpgUtil {
         return list;
     }
 
-    private static String getIndexFile(String vedioAddress) throws Exception{
+    private  String getIndexFile(String vedioAddress) throws Exception{
         URL url = new URL(vedioAddress);
         BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(),"UTF-8"));
         StringBuilder contentBuilder = new StringBuilder();
@@ -519,7 +519,7 @@ public class Video2JpgUtil {
         return contentBuilder.toString();
     }
 
-    private static void test1(String vedioAddress) throws Exception{
+    private  void test1(String vedioAddress) throws Exception{
 //        File file = new File("/Users/kuchensheng/Desktop/panda_new.mp4");
 //        FileInputStream inputStream = new FileInputStream(file);
         FFmpegFrameGrabber ff = new FFmpegFrameGrabber(vedioAddress);
