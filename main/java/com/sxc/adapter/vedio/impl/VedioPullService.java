@@ -12,7 +12,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
-import org.bytedeco.javacv.FrameGrabber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +61,8 @@ public class VedioPullService implements IVedioPullService {
 
     private static final CloseableHttpClient httpClient = HttpClients.createDefault();
 
+    private static final String targetPath = System.getProperty("user.home");
+
     @Override
     public List<VedioDataAddressModel> vedioList(String accessToken) throws Exception {
         logger.info("获取accessToken={}对应的所有的视频列表信息",accessToken);
@@ -109,7 +110,7 @@ public class VedioPullService implements IVedioPullService {
     }
 
     @Override
-    public List<IVedioPullService> pullAllVedio(String accessToken, String targetPath) throws Exception{
+    public List<IVedioPullService> pullAllVedio(String accessToken) throws Exception{
         logger.info("将获取到的视频列表逐个启动视频录制,accessToken:{},targetPath:{}",accessToken,targetPath);
         List<VedioDataAddressModel> vedioDataAddressModels = vedioList(accessToken);
         List<IVedioPullService> result = new ArrayList<>(vedioDataAddressModels.size());
@@ -121,7 +122,7 @@ public class VedioPullService implements IVedioPullService {
     }
 
     @Override
-    public List<IVedioPullService> pullAllVedioAndCutFrame(String accessToken, String targetPath, String frameTargetAddress, FrameTargetTypeEnum type) throws Exception {
+    public List<IVedioPullService> pullAllVedioAndCutFrame(String accessToken, String frameTargetAddress, FrameTargetTypeEnum type) throws Exception {
         logger.info("将获取到的视频列表逐个启动视频录制,accessToken:{},targetPath:{}",accessToken,targetPath);
         List<VedioDataAddressModel> vedioDataAddressModels = vedioList(accessToken);
         List<IVedioPullService> result = new ArrayList<>(vedioDataAddressModels.size());
@@ -133,7 +134,7 @@ public class VedioPullService implements IVedioPullService {
     }
 
     @Override
-    public List<IVedioPullService> pullAllVedio(String appKey, String secret, String targetPath) throws Exception{
+    public List<IVedioPullService> pullAllVedio(String appKey, String secret) throws Exception{
         return pullAllVedio(getAccessToken(appKey,secret),targetPath);
     }
 

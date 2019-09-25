@@ -44,12 +44,12 @@ public class VideoRecordThread extends Thread {
     @Override
     public void run() {
         double frameRate = grabber.getFrameRate();
-        long sleepTime = (long) (1/frameRate * 1000);
         long startTime_null = System.currentTimeMillis();
         boolean restart = false;
         while (true) {
             try {
                 Frame frame = grabber.grabFrame();
+                recorder.record(frame);
                 if(null == frame || null == frame.image) {
                     logger.info("获取到的frame为空，或者frame.image为空");
                     long endTime = System.currentTimeMillis();
@@ -59,7 +59,6 @@ public class VideoRecordThread extends Thread {
                     }
                 }else {
                     startTime_null = System.currentTimeMillis();
-                    recorder.record(frame,0);
                     if(index.get() % (int) (frameRate/2) == 0) {
                         this.pulper.send2Kafka(frame,finalVedioPath,index.get());
                     }

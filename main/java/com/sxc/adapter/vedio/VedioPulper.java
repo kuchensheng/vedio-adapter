@@ -137,7 +137,7 @@ public class VedioPulper {
 //        format = "mp4";
         //两个小时更改一次地址信息
         this.task = new Task(getTargetFilePath(),format);
-        new Timer("updateVedioPathTimer").schedule(task,0,600000);
+        new Timer("updateVedioPathTimer").schedule(task,0,3600000);
         logger.info("摄像头录制的视频地址："+getFinalVideoPath());
         Integer frameWight = grabber.getImageWidth();
         Integer frameHeigh = grabber.getImageHeight();
@@ -149,6 +149,7 @@ public class VedioPulper {
         FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(getFinalVideoPath(),frameWight,frameHeigh,2);
         recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
         recorder.setFormat(format);
+        recorder.setFrameRate(10d);
 //        recorder.setFrameRate(frameRate);
         recorder.start();
 
@@ -294,7 +295,7 @@ public class VedioPulper {
 //            logger.info(str);
             String uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121.hd";
 
-            VedioPulper pulper = new VedioPulper(uri,"/Users/kuchensheng/Desktop/test","D21784420");
+            VedioPulper pulper = new VedioPulper(uri,System.getProperty("user.home"),"D21784420");
 //            FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(uri);
 //            grabber.start();
 //            new Thread(new Runnable() {
