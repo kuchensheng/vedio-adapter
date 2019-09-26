@@ -1,12 +1,16 @@
 package com.sxc.adapter.vedio;
 
+import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.FFmpegFrameRecorder;
 import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.FrameRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,8 +37,7 @@ public class VideoRecordThread extends Thread {
     private String finalVedioPath;
     private VedioPulper pulper;
 
-    public VideoRecordThread(FFmpegFrameRecorder recorder, FFmpegFrameGrabber grabber, AtomicInteger index, String finalVedioPath,VedioPulper pulper) {
-        this.recorder = recorder;
+    public VideoRecordThread(FFmpegFrameGrabber grabber, AtomicInteger index, String finalVedioPath,VedioPulper pulper) {
         this.grabber = grabber;
         this.index = index;
         this.finalVedioPath = finalVedioPath;
@@ -43,6 +46,10 @@ public class VideoRecordThread extends Thread {
 
     @Override
     public void run() {
+        recorder = initRecorder();
+        if(null == recorder) {
+            return;
+        }
         double frameRate = grabber.getFrameRate();
         long startTime_null = System.currentTimeMillis();
         boolean restart = false;
@@ -63,7 +70,6 @@ public class VideoRecordThread extends Thread {
                         this.pulper.send2Kafka(frame,finalVedioPath,index.get());
                     }
                 }
-//                TimeUnit.MILLISECONDS.sleep(sleepTime);
                 index.incrementAndGet();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -71,13 +77,38 @@ public class VideoRecordThread extends Thread {
         }
         if(restart) {
             logger.info("长时间获取不到frame，重新拉取视频");
-            pulper.getTask().cancel();
             try {
                 pulper.start(this);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    private FFmpegFrameRecorder initRecorder(){
+        try {
+            Integer frameWight = grabber.getImageWidth();
+            Integer frameHeigh = grabber.getImageHeight();
+
+            if(frameWight < 780) {
+                frameWight = 780;
+            }
+            String format= grabber.getFormat();
+            String vedioName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm"));
+            String vedioPath = this.finalVedioPath.concat(vedioName).concat("_").concat(this.pulper.getVedio_index().get()+"").concat(".").concat(format);
+            logger.info("摄像头录制的视频地址：{}",vedioPath);
+            System.out.println(String.format("摄像头录制的视频地址：%s",vedioPath));
+            FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(vedioPath,frameWight,frameHeigh,1);
+            recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
+            recorder.setFormat(format);
+            recorder.setFrameRate(10d);
+            recorder.start();
+            return recorder;
+        } catch (FrameRecorder.Exception e) {
+            logger.error("recorder初始化失败",e);
+        }
+
+        return null;
     }
 
 }

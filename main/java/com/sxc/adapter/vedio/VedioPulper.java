@@ -13,9 +13,9 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.Timer;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
@@ -40,7 +40,7 @@ public class VedioPulper {
 
     private static Logger logger = Logger.getLogger(VedioPulper.class.getSimpleName());
 
-    private static final ExecutorService executors = Executors.newFixedThreadPool(50);
+    private static final ScheduledExecutorService executors = Executors.newScheduledThreadPool(1);
 
     private String vedioAddress;
 
@@ -52,17 +52,17 @@ public class VedioPulper {
 
     private static AtomicInteger index = new AtomicInteger(0);
 
-    private static AtomicInteger vedio_index;
+    private AtomicInteger vedio_index;
 
     private String finalVideoPath = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH"));
 
     private static volatile long start = 0l;
 
-    private Task task;
-
     private IVedioPullService.FrameTargetTypeEnum type;
 
     private String deviceSerial;
+
+    private FFmpegFrameRecorder recorder;
 
     public VedioPulper(String vedioAddress, String targetPath, String frameTargetAddress, IVedioPullService.FrameTargetTypeEnum type,String deviceSerial) {
         this.vedioAddress = vedioAddress;
@@ -86,13 +86,6 @@ public class VedioPulper {
         return this.finalVideoPath;
     }
 
-    public Task getTask() {
-        return task;
-    }
-
-    public void setTask(Task task) {
-        this.task = task;
-    }
 
     public VedioPulper(String vedioAddress, String targetFilePath,String deviceSerial) {
         this.vedioAddress = vedioAddress;
@@ -117,44 +110,94 @@ public class VedioPulper {
 
     /**
      * 视频拉取
+     * @param delay 单位秒
      */
-    public void pull() throws Exception {
-        vedio_index = new AtomicInteger(0);
-        logger.info("拉取视频源："+this.vedioAddress+"\n存储地址："+this.targetFilePath);
-        if(!this.targetFilePath.endsWith(File.separator)) {
-            setTargetFilePath(targetFilePath.concat(File.separator));
+    public void pull(FFmpegFrameGrabber grabber, int delay) throws Exception {
+        this.recorder = initRecorder(grabber);
+        if(null == recorder) {
+            return;
+        }
+        double frameRate = grabber.getFrameRate();
+        long startTime_null = System.currentTimeMillis();
+        boolean restart = false;
+
+        long start=LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));
+
+        while (true) {
+            try {
+                Frame frame = grabber.grabFrame();
+                if (null == frame || null == frame.image) {
+                    continue;
+                }
+                recorder.record(frame);
+                long end = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));
+                if(end - start >=delay) {
+                    logger.info(String.format("定时关闭record,生成新视频"));
+                    stopRecorder(Thread.currentThread());
+                    break;
+                }
+                if(null == frame || null == frame.image) {
+                    logger.info("获取到的frame为空，或者frame.image为空");
+                    long endTime = System.currentTimeMillis();
+                    if(endTime - startTime_null > 1000) {
+                        restart = true;
+                        break;
+                    }
+                }else {
+                    startTime_null = System.currentTimeMillis();
+                    if(index.get() % (int) (frameRate/2) == 0) {
+                        this.send2Kafka(frame,getTargetFilePath(),index.get());
+                    }
+                }
+                index.incrementAndGet();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        if(restart) {
+            logger.info("长时间获取不到frame，重新拉取视频");
+            try {
+                recorder.stop();
+                recorder.release();
+                pull(grabber,delay);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void stopRecorder(Thread thread) {
+        try {
+            thread.interrupt();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private FFmpegFrameRecorder initRecorder(FFmpegFrameGrabber grabber){
+        try {
+            Integer frameWight = grabber.getImageWidth();
+            Integer frameHeigh = grabber.getImageHeight();
+
+            if(frameWight < 780) {
+                frameWight = 780;
+            }
+            String format= grabber.getFormat();
+            String vedioName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm"));
+            String vedioPath = this.targetFilePath.concat(vedioName).concat("_").concat(this.getVedio_index().get()+"").concat(".").concat(format);
+            logger.info(String.format("摄像头录制的视频地址：%s",vedioPath));
+            FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(vedioPath,frameWight,frameHeigh,1);
+            recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
+            recorder.setFormat(format);
+            recorder.setFrameRate(10d);
+            recorder.setGopSize(10);
+            recorder.start();
+            return recorder;
+        } catch (FrameRecorder.Exception e) {
+            logger.info("recorder初始化失败"+e);
         }
 
-        if(!getFinalVideoPath().contains(this.deviceSerial)) {
-            setTargetFilePath(this.targetFilePath.concat(this.deviceSerial).concat(File.separator));
-        }
-
-        createFile(getTargetFilePath());
-        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(this.vedioAddress);
-        grabber.start();
-
-        String format = grabber.getFormat();
-//        format = "mp4";
-        //两个小时更改一次地址信息
-        this.task = new Task(getTargetFilePath(),format);
-        new Timer("updateVedioPathTimer").schedule(task,0,3600000);
-        logger.info("摄像头录制的视频地址："+getFinalVideoPath());
-        Integer frameWight = grabber.getImageWidth();
-        Integer frameHeigh = grabber.getImageHeight();
-
-        if(frameWight < 780) {
-            frameWight = 780;
-        }
-//        double frameRate = grabber.getFrameRate();
-        FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(getFinalVideoPath(),frameWight,frameHeigh,2);
-        recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
-        recorder.setFormat(format);
-        recorder.setFrameRate(10d);
-//        recorder.setFrameRate(frameRate);
-        recorder.start();
-
-        VideoRecordThread thread = new VideoRecordThread(recorder,grabber,index,getFinalVideoPath(),this);
-        executors.execute(thread);
+        return null;
     }
 
     public void start(VideoRecordThread videoRecordThread) {
@@ -166,34 +209,6 @@ public class VedioPulper {
         }
     }
 
-    class Task extends TimerTask {
-        private String vedioPath;
-        private String format;
-
-        public Task(String vedioPath,String format) {
-            this.vedioPath = vedioPath;
-            this.format = format;
-        }
-
-        @Override
-        public void run() {
-            LocalDateTime now = LocalDateTime.now();
-            start = now.getNano();
-            String endTime = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm"));
-            setFinalVideoPath(getVedioPath().concat(endTime).concat("_"+vedio_index.get()).concat(".").concat(this.format));
-            //当重新生成视频时，帧数要重新计算
-            index.set(0);
-        }
-
-        public String getVedioPath() {
-            return vedioPath;
-        }
-
-        public void setVedioPath(String vedioPath) {
-            this.vedioPath = vedioPath;
-        }
-
-    }
 
     private static final String kafka_topic = "to_processed_frame";
     protected void send2Kafka(Frame frame, String videoName, int frameIndex) throws IOException {
@@ -249,9 +264,51 @@ public class VedioPulper {
         return outputStream.toByteArray();
     }
 
+    /**
+     * 启动器
+     * @param grabber
+     * @param delay 时间间隔 单位秒
+     * @throws Exception
+     */
+    public void start(FFmpegFrameGrabber grabber, int delay) throws Exception {
+        executors.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if(null != recorder) {
+                        recorder.stop();
+                        recorder.release();
+                    }
+                    System.out.println(String.format("这里是测试代码,测试时间%s",LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
 
+                    pull(grabber,delay);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        },0,60,TimeUnit.SECONDS);
+    }
+
+    /**
+     * 视频拉取器启动方法，默认两个小时 7200s拉取生成一个视频
+     * @throws Exception
+     */
     public void start() throws Exception {
-        pull();
+        vedio_index = new AtomicInteger(0);
+        logger.info("拉取视频源："+this.vedioAddress+"\n存储地址："+this.targetFilePath);
+        if(!this.targetFilePath.endsWith(File.separator)) {
+            setTargetFilePath(targetFilePath.concat(File.separator));
+        }
+
+        if(!getFinalVideoPath().contains(this.deviceSerial)) {
+            setTargetFilePath(this.targetFilePath.concat(this.deviceSerial).concat(File.separator));
+        }
+
+        createFile(getTargetFilePath());
+        final FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(this.vedioAddress);
+        grabber.start();
+
+        start(grabber,7200);
     }
 
     public String getTargetFilePath() {
@@ -289,27 +346,18 @@ public class VedioPulper {
         this.kafka_bootstrap_server = kafka_bootstrap_server;
     }
 
+    public AtomicInteger getVedio_index() {
+        return vedio_index;
+    }
+
+    public void setVedio_index(AtomicInteger vedio_index) {
+        this.vedio_index = vedio_index;
+    }
+
     public static void main(String[] args) {
         try {
-//            String str = Loader.load(opencv_objdetect.class);
-//            logger.info(str);
             String uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121.hd";
-
             VedioPulper pulper = new VedioPulper(uri,System.getProperty("user.home"),"D21784420");
-//            FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(uri);
-//            grabber.start();
-//            new Thread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    try {
-//                        pulper.shwoFrames(grabber);
-//                        grabber.stop();
-//                        grabber.close();
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }).start();
             pulper.start();
 
         } catch (Exception e) {
