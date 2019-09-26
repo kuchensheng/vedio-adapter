@@ -183,7 +183,7 @@ public class VedioPulper {
                 frameWight = 780;
             }
             String format= grabber.getFormat();
-            String vedioName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm"));
+            String vedioName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH"));
             String vedioPath = this.targetFilePath.concat(vedioName).concat("_").concat(this.getVedio_index().get()+"").concat(".").concat(format);
             logger.info(String.format("摄像头录制的视频地址：%s",vedioPath));
             FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(vedioPath,frameWight,frameHeigh,1);
@@ -279,8 +279,6 @@ public class VedioPulper {
                         recorder.stop();
                         recorder.release();
                     }
-                    System.out.println(String.format("这里是测试代码,测试时间%s",LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
-
                     pull(grabber,delay);
                 } catch (Exception e) {
                     e.printStackTrace();
