@@ -62,8 +62,6 @@ public class VedioPulper {
 
     private String deviceSerial;
 
-    private FFmpegFrameRecorder recorder;
-
     public VedioPulper(String vedioAddress, String targetPath, String frameTargetAddress, IVedioPullService.FrameTargetTypeEnum type,String deviceSerial) {
         this.vedioAddress = vedioAddress;
         this.targetFilePath = targetPath;
@@ -113,10 +111,11 @@ public class VedioPulper {
      * @param delay 单位秒
      */
     public void pull(FFmpegFrameGrabber grabber, int delay) throws Exception {
-        this.recorder = initRecorder(grabber);
+        FFmpegFrameRecorder recorder = initRecorder(grabber);
         if(null == recorder) {
             return;
         }
+
         double frameRate = grabber.getFrameRate();
         long startTime_null = System.currentTimeMillis();
         boolean restart = false;
@@ -133,7 +132,7 @@ public class VedioPulper {
                 long end = LocalDateTime.now().toEpochSecond(ZoneOffset.of("+8"));
                 if(end - start >=delay) {
                     logger.info(String.format("定时关闭record,生成新视频"));
-                    stopRecorder(Thread.currentThread());
+                    stopRecorder(Thread.currentThread(),grabber,delay);
                     break;
                 }
                 if(null == frame || null == frame.image) {
@@ -146,7 +145,7 @@ public class VedioPulper {
                 }else {
                     startTime_null = System.currentTimeMillis();
                     if(index.get() % (int) (frameRate/2) == 0) {
-                        this.send2Kafka(frame,getTargetFilePath(),index.get());
+                        send2Kafka(frame,getTargetFilePath(),index.get());
                     }
                 }
                 index.incrementAndGet();
@@ -166,8 +165,9 @@ public class VedioPulper {
         }
     }
 
-    private void stopRecorder(Thread thread) {
+    private void stopRecorder(Thread thread, FFmpegFrameGrabber grabber, int delay) {
         try {
+            start(grabber,delay);
             thread.interrupt();
         } catch (Exception e) {
             e.printStackTrace();
@@ -189,7 +189,7 @@ public class VedioPulper {
             FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(vedioPath,frameWight,frameHeigh,1);
             recorder.setVideoCodec(avcodec.AV_CODEC_ID_H264);
             recorder.setFormat(format);
-            recorder.setFrameRate(10d);
+            recorder.setFrameRate(grabber.getFrameRate());
             recorder.setGopSize(10);
             recorder.start();
             return recorder;
@@ -270,21 +270,28 @@ public class VedioPulper {
      * @param delay 时间间隔 单位秒
      * @throws Exception
      */
-    public void start(FFmpegFrameGrabber grabber, int delay) throws Exception {
-        executors.scheduleWithFixedDelay(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if(null != recorder) {
-                        recorder.stop();
-                        recorder.release();
-                    }
-                    pull(grabber,delay);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+    public void start(final FFmpegFrameGrabber grabber, final int delay) throws Exception {
+        executors.execute(() -> {
+            try {
+                pull(grabber,delay);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        },0,60,TimeUnit.SECONDS);
+        });
+//        executors.scheduleWithFixedDelay(new Runnable() {
+//            @Override
+//            public void run() {
+//                try {
+//                    if(null != recorder) {
+//                        recorder.stop();
+//                        recorder.release();
+//                    }
+//                    pull(grabber,delay);
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        },0,delay,TimeUnit.SECONDS);
     }
 
     /**
@@ -303,10 +310,10 @@ public class VedioPulper {
         }
 
         createFile(getTargetFilePath());
-        final FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(this.vedioAddress);
+        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(this.vedioAddress);
         grabber.start();
 
-        start(grabber,7200);
+        start(grabber,60);
     }
 
     public String getTargetFilePath() {
@@ -354,13 +361,23 @@ public class VedioPulper {
 
     public static void main(String[] args) {
         try {
-            String uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121.hd";
-            VedioPulper pulper = new VedioPulper(uri,System.getProperty("user.home"),"D21784420");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            System.out.println("请输入视频地址，例如：rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121");
+            String uri = reader.readLine();
+            if(null == uri || uri.trim().length() == 0) {
+                uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121";
+            }
+            System.out.println("请输入设备序列号，例如：D21784420");
+            String deviceSerial = reader.readLine();
+            if (null == deviceSerial || deviceSerial.trim().length() == 0) {
+                deviceSerial = "D21784420";
+            }
+            VedioPulper pulper = new VedioPulper(uri,System.getProperty("user.home"),deviceSerial);
             pulper.start();
 
         } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
+            logger.info(e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 }
