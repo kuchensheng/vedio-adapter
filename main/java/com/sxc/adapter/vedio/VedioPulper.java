@@ -299,6 +299,10 @@ public class VedioPulper {
      * @throws Exception
      */
     public void start() throws Exception {
+        start(7200);
+    }
+
+    public void start(int delay) throws Exception{
         vedio_index = new AtomicInteger(0);
         logger.info("拉取视频源："+this.vedioAddress+"\n存储地址："+this.targetFilePath);
         if(!this.targetFilePath.endsWith(File.separator)) {
@@ -313,7 +317,7 @@ public class VedioPulper {
         FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(this.vedioAddress);
         grabber.start();
 
-        start(grabber,60);
+        start(grabber,delay);
     }
 
     public String getTargetFilePath() {
