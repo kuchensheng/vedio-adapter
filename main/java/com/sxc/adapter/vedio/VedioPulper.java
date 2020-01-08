@@ -365,19 +365,32 @@ public class VedioPulper {
 
     public static void main(String[] args) {
         try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-            System.out.println("请输入视频地址，例如：rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121");
-            String uri = reader.readLine();
-            if(null == uri || uri.trim().length() == 0) {
-                uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121";
+//            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+//            System.out.println("请输入视频地址，例如：rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121");
+//            String uri = reader.readLine();
+//            if(null == uri || uri.trim().length() == 0) {
+//                uri = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121";
+//            }
+//            System.out.println("请输入设备序列号，例如：D21784420");
+//            String deviceSerial = reader.readLine();
+//            if (null == deviceSerial || deviceSerial.trim().length() == 0) {
+//                deviceSerial = "D21784420";
+//            }
+            String url = args[0];
+            String deviceSerial = args[1];
+            String delay = args[2];
+            if(null == url || url.trim().length() == 0) {
+                url = "rtmp://rtmp01open.ys7.com/openlive/60212ce632c341028b6da41da5dc4121";
             }
-            System.out.println("请输入设备序列号，例如：D21784420");
-            String deviceSerial = reader.readLine();
-            if (null == deviceSerial || deviceSerial.trim().length() == 0) {
+            if(null == deviceSerial || deviceSerial.trim().length() == 0) {
                 deviceSerial = "D21784420";
             }
-            VedioPulper pulper = new VedioPulper(uri,System.getProperty("user.home"),deviceSerial);
-            pulper.start();
+            if(null == delay || delay.trim().length() == 0) {
+                delay = "7200";
+            }
+            logger.info(String.format("执行参数：url=%s,deviceSerial=%s,delay=%s",url,deviceSerial,delay));
+            VedioPulper pulper = new VedioPulper(url,System.getProperty("user.home"),deviceSerial);
+            pulper.start(Integer.valueOf(delay));
 
         } catch (Exception e) {
             logger.info(e.getMessage());
